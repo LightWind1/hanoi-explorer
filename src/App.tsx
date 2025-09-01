@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import html2canvas from "html2canvas";
 import JSZip from "jszip";
@@ -16,10 +16,10 @@ import JSZip from "jszip";
 export default function App() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
-      <header className="px-6 py-8 border-b bg-white sticky top-0 z-10">
+      {/* <header className="px-6 py-8 border-b bg-white sticky top-0 z-10">
         <h1 className="text-3xl font-bold tracking-tight">汉诺塔 · 最终版</h1>
         <p className="text-sm text-gray-600 mt-2">完整功能：播放、导出、箭头可定制。直接运行即可。</p>
-      </header>
+      </header> */}
       <main className="p-6 max-w-6xl mx-auto grid grid-cols-1 xl:grid-cols-12 gap-6">
         <div className="xl:col-span-4">
           <ControlPanel />
@@ -33,49 +33,58 @@ export default function App() {
   );
 }
 
+type Move = { from: number; to: number };
+type Point = { x: number; y: number };
+
+
 // --------- Global state (simple event bus) ----------
 const GlobalState = {
   n: 3,
-  setN(n) { this.n = n; emit(); },
-  moves: [],
-  setMoves(m) { this.moves = m; emit(); },
+  setN(n: number) { this.n = n; emit(); },
+  moves: [] as Move[],
+  setMoves(m: Move[]) { this.moves = m; emit(); },
   playing: false,
-  setPlaying(p) { this.playing = p; emit(); },
+  setPlaying(p: boolean) { this.playing = p; emit(); },
   baseMs: 600, // base ms per step at 1x
-  setBaseMs(ms) { this.baseMs = ms; emit(); },
+  setBaseMs(ms: number) { this.baseMs = ms; emit(); },
   speedMultiplier: 1,
-  setSpeedMultiplier(m) { this.speedMultiplier = m; emit(); },
+  setSpeedMultiplier(m: number) { this.speedMultiplier = m; emit(); },
   stepIndex: 0,
-  setStepIndex(i) { this.stepIndex = i; emit(); },
+  setStepIndex(i: number) { this.stepIndex = i; emit(); },
   showArrow: true,
-  setShowArrow(b) { this.showArrow = b; emit(); },
+  setShowArrow(b: boolean) { this.showArrow = b; emit(); },
   arrowColor: "#ff0000",
-  setArrowColor(c) { this.arrowColor = c; emit(); },
+  setArrowColor(c: string) { this.arrowColor = c; emit(); },
   arrowWidth: 2,
-  setArrowWidth(w) { this.arrowWidth = w; emit(); },
+  setArrowWidth(w: number) { this.arrowWidth = w; emit(); },
 };
 
-const listeners = new Set();
+const listeners = new Set<() => void>();
 function emit() { listeners.forEach((fn) => fn()); }
-const useGlobal = () => {
+
+const useGlobal = (() => {
   const [, setTick] = useState(0);
-  useEffect(() => { const fn = () => setTick((v) => v + 1); listeners.add(fn); return () => listeners.delete(fn); }, []);
+  useEffect(() => {
+    const fn = () => setTick((v) => v + 1);
+    listeners.add(fn);
+    return () => { listeners.delete(fn); }; // 用 {} 包裹，返回 void
+  }, []);
   return GlobalState;
-};
+});
 
 // --------- Utilities ---------
-function bigintPow2(n) { return 1n << BigInt(n); }
-function minMovesBigInt(n) { return n < 0 ? 0n : bigintPow2(n) - 1n; }
-function formatBigInt(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+function bigintPow2(n: number) { return 1n << BigInt(n); }
+function minMovesBigInt(n: number) { return n < 0 ? 0n : bigintPow2(n) - 1n; }
+function formatBigInt(n: bigint | number) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
 
-function generateMoves(n, from, to, aux, acc) {
+function generateMoves(n: number, from: number, to: number, aux: number, acc: Move[]) {
   if (n <= 0) return;
   generateMoves(n - 1, from, aux, to, acc);
   acc.push({ from, to });
   generateMoves(n - 1, aux, to, from, acc);
 }
 
-function getStateAfterKMoves(n, moves, k) {
+function getStateAfterKMoves(n: number, moves: Move[], k: number):number[][] {
   const state = [Array.from({ length: n }, (_, i) => n - i), [], []];
   const steps = Math.max(0, Math.min(moves.length, k));
   for (let i = 0; i < steps; i++) {
@@ -86,13 +95,13 @@ function getStateAfterKMoves(n, moves, k) {
   return state;
 }
 
-function downloadBlob(blob, filename) {
+function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
-function downloadDataUrl(dataUrl, filename) {
+function downloadDataUrl(dataUrl: string, filename: string) {
   const a = document.createElement("a"); a.href = dataUrl; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); }
 
 // --------- ControlPanel ---------
@@ -106,7 +115,13 @@ function ControlPanel() {
   const applyN = () => {
     let n = Math.max(1, Math.min(64, Math.floor(inputN)));
     GlobalState.setN(n); GlobalState.setPlaying(false); GlobalState.setStepIndex(0);
-    if (n <= 12) { const acc = []; generateMoves(n, 0, 2, 1, acc); GlobalState.setMoves(acc); } else { GlobalState.setMoves([]); }
+    if (n <= 12) { 
+      const acc: Move[] = []; 
+      generateMoves(n, 0, 2, 1, acc); 
+      GlobalState.setMoves(acc); 
+    } else { 
+      GlobalState.setMoves([]); 
+    }
   };
 
   useEffect(() => { applyN(); }, []);
@@ -181,7 +196,8 @@ function Visualizer() {
   const { n, moves, playing } = gs;
   const stepIndex = gs.stepIndex;
   const containerRef = useRef(null);
-  const pegRefs = [useRef(null), useRef(null), useRef(null)];
+  const pegRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
+
   const [pegPos, setPegPos] = useState([{x:0,y:0},{x:0,y:0},{x:0,y:0}]);
 
   const pegs = useMemo(() => getStateAfterKMoves(n, moves, stepIndex), [n, moves, stepIndex]);
@@ -191,8 +207,8 @@ function Visualizer() {
     function update() {
       const container = containerRef.current;
       if (!container) return;
-      const rect = container.getBoundingClientRect();
-      const pos = pegRefs.map((r) => {
+      const rect = (container as HTMLElement).getBoundingClientRect();
+      const pos: Point[] = pegRefs.map((r) => {
         const el = r.current;
         if (!el) return { x: rect.left + rect.width * 0.16, y: rect.top + 40 };
         const rrect = el.getBoundingClientRect();
@@ -254,19 +270,21 @@ function Visualizer() {
     downloadBlob(blob, 'hanoi-steps.zip');
   };
 
-  const currentMove = moves && moves.length ? (gs.stepIndex < moves.length ? moves[gs.stepIndex] : null) : null;
+  const currentMove: Move | null = moves && moves.length
+  ? gs.stepIndex < moves.length ? moves[gs.stepIndex] : null
+  : null;
   const progress = moves && moves.length ? Math.min(1, gs.stepIndex / moves.length) : 0;
 
   // helper to build curved path between two peg positions inside container
-  const buildPath = (p1, p2, curvature = 0.45) => {
-    // p1/p2 are relative to container (x,y)
-    const dx = p2.x - p1.x;
-    const dy = p2.y - p1.y;
-    const mx = p1.x + dx / 2;
-    // control point above the pegs, negative dy to lift
-    const controlY = Math.min(p1.y, p2.y) - Math.abs(dx) * curvature - 20;
-    return `M ${p1.x},${p1.y} Q ${mx},${controlY} ${p2.x},${p2.y}`;
-  };
+  // const buildPath = (p1: Point, p2: Point, curvature = 0.45) => {
+  //   // p1/p2 are relative to container (x,y)
+  //   const dx = p2.x - p1.x;
+  //   const dy = p2.y - p1.y;
+  //   const mx = p1.x + dx / 2;
+  //   // control point above the pegs, negative dy to lift
+  //   const controlY = Math.min(p1.y, p2.y) - Math.abs(dx) * curvature - 20;
+  //   return `M ${p1.x},${p1.y} Q ${mx},${controlY} ${p2.x},${p2.y}`;
+  // };
 
   return (
     <div className="space-y-4">
@@ -336,12 +354,13 @@ function Visualizer() {
 }
 
 // helper: peg positions array might be empty at first; provide safe fallback
-function pegPosSafe(pegPos, fallbackIndex, idx) {
-  if (!pegPos || !pegPos[idx] || typeof pegPos[idx].x !== 'number') return { x: (fallbackIndex+1)*100, y: 40 };
+function pegPosSafe(pegPos: Point[], fallbackIndex: number, idx: number): Point {
+  if (!pegPos || !pegPos[idx] || typeof pegPos[idx].x !== 'number') 
+    return { x: (fallbackIndex+1)*100, y: 40 };
   return pegPos[idx];
 }
 
-function buildSvgPath(p1, p2) {
+function buildSvgPath(p1: Point, p2: Point) {
   // ensure numbers
   const x1 = Math.round(p1.x);
   const y1 = Math.round(p1.y + 8); // a little below top
@@ -359,11 +378,11 @@ function buildSvgPath(p1, p2) {
   return `M ${x1} ${y1} Q ${mx} ${Math.round(controlY)} ${x2} ${y2}`;
 }
 
-function diskWidth(size, n) {
+function diskWidth(size:number, n:number) {
   const minW = 40; const maxW = 180; if (n <= 1) return maxW; return minW + ((size - 1) * (maxW - minW)) / (n - 1);
 }
 
-function pegLabel(p) { return p === 0 ? 'A' : p === 1 ? 'B' : 'C'; }
+function pegLabel(p: number) { return p === 0 ? 'A' : p === 1 ? 'B' : 'C'; }
 
 // --------- MoveList ---------
 function MoveList() {
@@ -402,4 +421,12 @@ function MoveList() {
 }
 
 // --------- light tests (console) ---------
-(function runLightTests(){ try { console.assert(minMovesBigInt(1).toString()==='1'); console.assert(minMovesBigInt(2).toString()==='3'); const mv=[]; generateMoves(3,0,2,1,mv); const s0=getStateAfterKMoves(3,mv,0); console.assert(s0[0].length===3 && s0[1].length===0 && s0[2].length===0); } catch(e){ console.warn('test fail',e); } })();
+(function runLightTests(){ 
+  try { console.assert(minMovesBigInt(1).toString()==='1'); 
+    console.assert(minMovesBigInt(2).toString()==='3'); 
+    const mv: Move[]=[]; generateMoves(3,0,2,1,mv); 
+    const s0=getStateAfterKMoves(3,mv,0); 
+    console.assert(s0[0].length===3 && s0[1].length===0 && s0[2].length===0); 
+  } catch(e){
+     console.warn('test fail',e); 
+    } })();
