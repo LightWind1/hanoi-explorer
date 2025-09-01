@@ -4,13 +4,12 @@ import html2canvas from "html2canvas";
 import JSZip from "jszip";
 
 // ==========================================
-// Hanoi Explorer — 最终版完整代码
+// Hanoi Explorer
 // 功能：
-// - 原始界面（层数输入、最少步数、步骤列表、播放控制）保留
+// - 层数输入、最少步数、步骤列表、播放控制
 // - 单步导出 PNG、批量导出 ZIP（包含 step-0.png）
 // - 箭头为弯曲贝塞尔曲线并带箭头头部；可显示/隐藏、调色、调粗细
 // - 播放速度倍率（0.5x-3x）、暂停/继续
-// - 不依赖 file-saver（使用原生下载方法）
 // ==========================================
 
 export default function App() {
