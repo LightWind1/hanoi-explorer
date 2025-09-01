@@ -39,7 +39,7 @@ type Point = { x: number; y: number };
 
 // --------- Global state (simple event bus) ----------
 const GlobalState = {
-  n: 3,
+  n: 4,
   setN(n: number) { this.n = n; emit(); },
   moves: [] as Move[],
   setMoves(m: Move[]) { this.moves = m; emit(); },
