@@ -13,6 +13,39 @@ import JSZip from "jszip";
 // ==========================================
 
 export default function App() {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    // 如果 URL 没有参数，则直接返回，不做任何修改
+    if (!params.toString()){
+        GlobalState.initDiskColors();
+        return;
+    }
+
+    const n = Number(params.get("n")) ?? 4;
+    const start = Number(params.get("start")) ?? 0;
+    const end = Number(params.get("end")) ?? 2;
+    const names = params.get("names");
+    const colors = params.get("colors");
+
+    GlobalState.setN(n);
+    GlobalState.setStartPeg(start);
+    GlobalState.setEndPeg(end);
+    const aux = [0, 1, 2].find(x => x !== start && x !== end)!;
+    GlobalState.setMiddlePeg(aux)//更新过渡柱子序号
+
+    if (names) {
+      GlobalState.setPegNames(names.split(","));
+    }
+    if (colors) {
+      try {
+        GlobalState.setDiskColors(JSON.parse(colors));
+      } catch {}
+    }
+
+    // const moves = generateMoves(n, start, end);
+    // GlobalState.setMoves(moves);
+  }, []);
+  
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       {/* <header className="px-6 py-8 border-b bg-white sticky top-0 z-10">
@@ -34,14 +67,80 @@ export default function App() {
 
 type Move = { from: number; to: number };
 type Point = { x: number; y: number };
+type DiskColors = Record<number, string>;
 
 
 // --------- Global state (simple event bus) ----------
 const GlobalState = {
   n: 4,
-  setN(n: number) { this.n = n; emit(); },
+  setN(n: number) { 
+    this.n = n; 
+    emit(); 
+  },
   moves: [] as Move[],
   setMoves(m: Move[]) { this.moves = m; emit(); },
+
+  diskColors: {} as DiskColors, // 初始化为空
+  initDiskColors(n: number = 4) {
+    const defaultColors = ["#ffff00", "#0000ff", "#00ff00", "#ff0000"];
+    const colors: Record<number, string> = {};
+    for (let i = 1; i <= n; i++) {
+      colors[i] = defaultColors[(i - 1) % defaultColors.length];
+    }
+    this.diskColors = colors;
+    emit();
+  },
+  setDiskColors(colors: DiskColors) {
+    this.diskColors = colors;
+    emit();
+  },
+  // diskColors: {
+  //   1: "#ffff00",
+  //   2: "#0000ff",
+  //   3: "#00ff00",
+  //   4: "#ff0000"
+  // },
+  // 例如 {1:"#ff0000", 2:"#00ff00"}
+ 
+  pegNames: ["左", "中", "右"], // 默认名称
+
+  startPeg: 0,
+  middlePeg: 1,
+  endPeg: 2,
+  setStartPeg(start: number) {
+    const oldStart = this.startPeg;
+    const oldEnd = this.endPeg;
+    console.log("oldEnd:"+this.endPeg)
+    if (start === oldEnd) {
+      // 自动互换
+      console.log("触发自动互换")
+      this.startPeg = oldEnd;
+      this.endPeg = oldStart;
+    } else {
+      this.startPeg = start;
+    }
+    console.log("NewStart:"+this.startPeg)
+    console.log("NewEnd:"+this.endPeg)
+    emit(); // 确保组件渲染拿到最新值
+  },
+  
+  setMiddlePeg(p: number) { this.middlePeg = p; emit(); },
+  
+  setEndPeg(end: number) {
+    const oldStart = this.startPeg
+    const oldEnd = this.endPeg;
+    if (end === this.startPeg) {
+      // 自动互换
+      console.log("触发自动互换")
+      this.endPeg = oldStart;
+      this.startPeg = oldEnd;
+    } else {
+      this.endPeg = end;
+    }
+    emit();
+  },
+
+  
   playing: false,
   setPlaying(p: boolean) { this.playing = p; emit(); },
   baseMs: 600, // base ms per step at 1x
@@ -56,6 +155,9 @@ const GlobalState = {
   setArrowColor(c: string) { this.arrowColor = c; emit(); },
   arrowWidth: 2,
   setArrowWidth(w: number) { this.arrowWidth = w; emit(); },
+  // setDiskColors(colors:[]) {this.diskColors = colors; emit(); },  //old
+  setPegNames(names: string[]) {this.pegNames = names; emit(); },
+
 };
 
 const listeners = new Set<() => void>();
@@ -82,14 +184,31 @@ function generateMoves(n: number, from: number, to: number, aux: number, acc: Mo
   acc.push({ from, to });
   generateMoves(n - 1, aux, to, from, acc);
 }
-
+function generateMovesAuto(n: number, startPeg: number, endPeg: number): Move[] {
+  const acc: Move[] = [];
+  if (n <= 0) return acc;
+  const aux = [0, 1, 2].find(x => x !== startPeg && x !== endPeg)!;
+  GlobalState.setMiddlePeg(aux)//更新过渡柱子序号
+  generateMoves(n, startPeg, endPeg, aux, acc);
+  return acc;
+}
+// n计算n步以后的位置
 function getStateAfterKMoves(n: number, moves: Move[], k: number):number[][] {
-  const state = [Array.from({ length: n }, (_, i) => n - i), [], []];
+   // 初始化三个柱子
+  const state: number[][] = [[], [], []];
+
+  // 把所有盘子放到用户指定的起点柱子
+  for (let i = n; i >= 1; i--) {
+    state[GlobalState.startPeg].push(i);
+  }
+  // 执行前 k 步
   const steps = Math.max(0, Math.min(moves.length, k));
   for (let i = 0; i < steps; i++) {
     const { from, to } = moves[i];
     const d = state[from].pop();
-    if (d !== undefined) state[to].push(d);
+    if (d !== undefined) {
+      state[to].push(d);
+    }
   }
   return state;
 }
@@ -113,26 +232,57 @@ function ControlPanel() {
 
   const applyN = () => {
     let n = Math.max(1, Math.min(64, Math.floor(inputN)));
-    GlobalState.setN(n); GlobalState.setPlaying(false); GlobalState.setStepIndex(0);
+    GlobalState.setN(n); 
+    GlobalState.setPlaying(false); 
+    GlobalState.setStepIndex(0);
+
     if (n <= 12) { 
-      const acc: Move[] = []; 
-      generateMoves(n, 0, 2, 1, acc); 
+      const acc = generateMovesAuto(n, gs.startPeg, gs.endPeg);
       GlobalState.setMoves(acc); 
     } else { 
       GlobalState.setMoves([]); 
     }
   };
 
-  useEffect(() => { applyN(); }, []);
+  useEffect(() => { applyN(); }, [gs.startPeg, gs.endPeg]);
 
   return (
     <div className="bg-white rounded-2xl shadow p-5 space-y-4">
+      {/* 层数 */}
       <div>
         <label className="block text-sm font-medium">层数（n）</label>
         <input type="number" min={1} max={64} value={inputN} onChange={(e) => setInputN(Number(e.target.value))} className="w-full rounded-xl border px-3 py-2" />
         <div className="text-xs text-gray-500 mt-1">动画上限：12 层（超过只显示步数）</div>
       </div>
 
+       {/* 新增 起点/终点选择 */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium">起点柱子</label>
+          <select
+            value={gs.startPeg}
+            onChange={(e) => GlobalState.setStartPeg(Number(e.target.value))}
+            className="w-full rounded-xl border px-3 py-2"
+          >
+            <option value={0}>{gs.pegNames[0]}</option>
+            <option value={1}>{gs.pegNames[1]}</option>
+            <option value={2}>{gs.pegNames[2]}</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium">终点柱子</label>
+          <select
+            value={gs.endPeg}
+            onChange={(e) => GlobalState.setEndPeg(Number(e.target.value))}
+            className="w-full rounded-xl border px-3 py-2"
+          >
+            {gs.pegNames.map((name, idx) => (
+        <option key={idx} value={idx}>{name}</option>
+      ))}
+          </select>
+        </div>
+      </div>
+      {/* 步数 / 可演示 */}
       <div className="grid grid-cols-2 gap-3">
         <div className="p-3 bg-gray-50 rounded-xl">
           <div className="text-sm text-gray-600">最少步数</div>
@@ -144,14 +294,40 @@ function ControlPanel() {
         </div>
       </div>
 
+      {/* 操作按钮 */}
       <div className="flex flex-wrap gap-3">
         <button onClick={applyN} className="px-4 py-2 rounded-xl bg-indigo-600 text-white">生成/更新</button>
-        <button onClick={() => { GlobalState.setPlaying(false); GlobalState.setStepIndex(0); }} className="px-4 py-2 rounded-xl bg-gray-200">重置</button>
+        <button onClick={() => { 
+                  GlobalState.setPlaying(false); 
+                  GlobalState.setStepIndex(0); 
+                  GlobalState.setStartPeg(0);
+                  GlobalState.setMiddlePeg(1);
+                  GlobalState.setEndPeg(2);
+                }} 
+                  className="px-4 py-2 rounded-xl bg-gray-200">重置</button>
+
+        <button onClick={() => {
+                  const params = new URLSearchParams();
+                  params.set("n", String(gs.n));
+                  params.set("start", String(gs.startPeg));
+                  params.set("end", String(gs.endPeg));
+                  params.set("names", gs.pegNames.join(","));
+                  params.set("colors", JSON.stringify(gs.diskColors));
+                  const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+                  navigator.clipboard.writeText(url).then(() => {
+                    alert("链接已复制，可以分享啦！");
+                  });
+                }}
+                className="px-4 py-2 rounded-xl bg-gray-200">分享配置</button>
       </div>
 
       <div className="pt-2 border-t" />
-
-      <div className="space-y-3">
+        {/* 箭头配置 */}
+    <details className="mt-4 border rounded p-2">  
+    
+      <summary className="cursor-pointer font-semibold flex justify-between items-center">
+        <span>箭头配置</span>
+        <div className="space-y-3">
         <div className="flex items-center justify-between">
           <label className="text-sm">显示箭头</label>
           <input type="checkbox" checked={gs.showArrow} onChange={(e) => GlobalState.setShowArrow(e.target.checked)} />
@@ -174,6 +350,75 @@ function ControlPanel() {
           <div className="text-xs text-gray-500">当前：{gs.speedMultiplier.toFixed(1)}x</div>
         </div>
       </div>
+      </summary>
+      </details>
+{/* 盘子颜色设置 */}
+    <details className="mt-4 border rounded p-2">
+      <summary className="cursor-pointer font-semibold flex justify-between items-center">
+      <span>盘子颜色设置</span>
+      <button
+        title="恢复默认颜色"
+        className="ml-2 text-gray-500 hover:text-gray-800"
+        onClick={(e) => {
+          e.preventDefault(); // 阻止折叠切换
+          GlobalState.setDiskColors({});
+        }}
+    >
+      ↺
+    </button>
+  </summary>
+  <div className="mt-2 space-y-2">
+    {Array.from({ length: gs.n }, (_, i) => {
+      const size = i + 1;
+      return (
+        <div key={size} className="flex items-center space-x-2">
+          <label className="w-16">盘子 {size}</label>
+          <input
+            type="color"
+            value={gs.diskColors[size] || "#4f46e5"}
+            onChange={(e) => {
+              const newColors = { ...gs.diskColors, [size]: e.target.value };
+              GlobalState.setDiskColors(newColors);
+            }}
+          />
+        </div>
+      );
+    })}
+  </div>
+</details>
+  {/* 柱子命名设置 */}
+<details className="mt-4 border rounded p-2">
+  <summary className="cursor-pointer font-semibold flex justify-between items-center">
+    <span>柱子命名设置</span>
+    <button
+      title="恢复默认名称"
+      className="ml-2 text-gray-500 hover:text-gray-800"
+      onClick={(e) => {
+        e.preventDefault(); // 阻止折叠切换
+        GlobalState.setPegNames(["A", "B", "C"]);
+      }}
+    >
+      ↺
+    </button>
+  </summary>
+  <div className="mt-2 space-y-2">
+    {["A", "B", "C"].map((defaultName, i) => (
+      <div key={i} className="flex items-center space-x-2">
+        <label className="w-12">柱子 {i+1}</label>
+        <input
+          type="text"
+          value={gs.pegNames?.[i] || defaultName}
+          onChange={(e) => {
+            const newNames = [...gs.pegNames];
+            newNames[i] = e.target.value;
+            GlobalState.setPegNames(newNames);
+          }}
+          className="border px-1 rounded"
+        />
+      </div>
+    ))}
+  </div>
+</details>
 
       <HowItWorks />
     </div>
@@ -319,12 +564,22 @@ function Visualizer() {
               <div className="w-full flex flex-col items-center gap-1 pb-2">
                 <AnimatePresence initial={false}>
                   {pegs[peg].slice().reverse().map((size) => (
-                    <motion.div key={`${peg}-${size}`} layout initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }} transition={{ type:'spring', stiffness:400, damping:30 }} className="h-6 rounded-full shadow-sm flex items-center justify-center text-xs font-medium text-white" style={{ width: `${diskWidth(size,n)}px`, background: `hsl(${(size*37)%360} 70% 50%)` }}>{size}</motion.div>
+                    <motion.div 
+                      key={`${peg}-${size}`} 
+                      layout initial={{ opacity:0, y:10 }} 
+                      animate={{ opacity:1, y:0 }} 
+                      exit={{ opacity:0 }} 
+                      transition={{ type:'spring', stiffness:400, damping:30 }} 
+                      className="h-6 rounded-full shadow-sm flex items-center justify-center text-xs font-medium text-white" 
+                      style={{
+                         width: `${diskWidth(size,n)}px`, 
+                         background: GlobalState.diskColors[size] || "#888" // 默认灰色
+                  }}>{size}</motion.div>
                   ))}
                 </AnimatePresence>
               </div>
 
-              <div className="absolute top-2 left-2 text-xs text-gray-500">{pegLabel(peg)}</div>
+              <div className="absolute top-2 left-2 text-xs text-gray-500">{pegLabel(peg,gs)}</div>
             </div>
           ))}
         </div>
@@ -381,7 +636,10 @@ function diskWidth(size:number, n:number) {
   const minW = 40; const maxW = 180; if (n <= 1) return maxW; return minW + ((size - 1) * (maxW - minW)) / (n - 1);
 }
 
-function pegLabel(p: number) { return p === 0 ? 'A' : p === 1 ? 'B' : 'C'; }
+function pegLabel(i: number, gs: typeof GlobalState): string  { 
+  return gs.pegNames[i] || ["A", "B", "C"][i];
+
+}
 
 // --------- MoveList ---------
 function MoveList() {
@@ -393,11 +651,26 @@ function MoveList() {
     return <div className="bg-white rounded-2xl shadow p-5 text-sm text-gray-600">当前层数较大或尚未生成步骤。将层数设置为不超过 12，并点击“生成/更新”即可查看完整步骤表。</div>;
   }
 
+  // 新增复制函数
+  const copyAllSteps = () => {
+    const text = moves.map((m, i) => `${i + 1}. ${pegLabel(m.from, gs)} -> ${pegLabel(m.to, gs)}`).join('\n');
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        alert('步骤已复制到剪贴板！');
+      })
+      .catch(() => {
+        alert('复制失败，请手动复制。');
+      });
+  };
+
   return (
     <div className="bg-white rounded-2xl shadow p-5">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">步骤列表（最优解）</h3>
         <div className="text-xs text-gray-500">点击任意行可跳转到该步</div>
+        <button onClick={copyAllSteps} className="text-xs px-2 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600">
+            一键复制
+          </button>
       </div>
       <div className="mt-3 max-h-72 overflow-auto rounded-lg border">
         <table className="w-full text-sm">
@@ -408,8 +681,8 @@ function MoveList() {
             {moves.map((m, i) => (
               <tr key={i} className={`border-t cursor-pointer ${i < stepIndex ? 'bg-emerald-50/50' : i === stepIndex ? 'bg-indigo-50' : 'hover:bg-gray-50'}`} onClick={() => { GlobalState.setPlaying(false); GlobalState.setStepIndex(i+1); }}>
                 <td className="px-3 py-2 tabular-nums">{i+1}</td>
-                <td className="px-3 py-2">{pegLabel(m.from)}</td>
-                <td className="px-3 py-2">{pegLabel(m.to)}</td>
+                <td className="px-3 py-2">{pegLabel(m.from,gs)}</td>
+                <td className="px-3 py-2">{pegLabel(m.to,gs)}</td>
               </tr>
             ))}
           </tbody>
