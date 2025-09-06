@@ -321,9 +321,13 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, _x1:number, _y1:number, x2
 function ControlPanel() {
   const gs = useGlobal();
   const [inputN, setInputN] = useState(gs.n);
+  const [exportOpen, setExportOpen] = useState(() => {
+    try { const p = new URLSearchParams(window.location.search).get('export'); return p === 'open'; } catch { return false; }
+  });
 
   const stepsStr = useMemo(() => formatBigInt(minMovesBigInt(inputN)), [inputN]);
-  const canPlay = inputN <= 12;
+  
+  const canPlay = inputN <= 12  && gs.startPeg !== gs.endPeg;
 
   const applyN = () => {
     let n = Math.max(1, Math.min(64, Math.floor(inputN)));
@@ -347,6 +351,17 @@ function ControlPanel() {
   };
 
   useEffect(() => { applyN(); }, [gs.startPeg, gs.endPeg]);
+
+  const toggleExportOpen = (val?: boolean) => {
+    const next = typeof val === 'boolean' ? val : !exportOpen;
+    setExportOpen(next);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      params.set('export', next ? 'open' : 'closed');
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      window.history.replaceState({}, '', newUrl);
+    } catch (e) { /* ignore */ }
+  };
 
   return (
     <div className="bg-white rounded-2xl shadow p-5 space-y-4">
@@ -422,6 +437,28 @@ function ControlPanel() {
                 }}
                 className="px-4 py-2 rounded-xl bg-gray-200">分享配置</button>
       </div>
+
+      <details className="rounded-xl bg-gray-50 p-3" open={exportOpen}>
+          <summary className="cursor-pointer font-medium flex justify-between items-center">
+            <span>导出 / 保存</span>
+            <div className="flex items-center gap-2">
+              <button onClick={(e) => { e.preventDefault(); toggleExportOpen(); }} className="text-sm text-gray-500">{exportOpen ? '收起' : '展开'}</button>
+            </div>
+          </summary>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button onClick={async () => {
+              // 导出当前可见步骤（DOM 截图）
+              const el = document.getElementById('hanoi-visual');
+              if (!el) return; const canvas = await html2canvas(el); downloadDataUrl(canvas.toDataURL('image/png'), `step-${gs.stepIndex}.png`);
+            }} className="px-3 py-2 rounded-xl bg-indigo-600 text-white">导出当前步图片</button>
+
+            <button onClick={async () => {
+              // 使用 snapshots 直接绘制并打包
+              await exportSnapshotsAsZip(gs.snapshots, gs.moves, gs);
+            }} className="px-3 py-2 rounded-xl bg-teal-600 text-white">批量导出 ZIP</button>
+          </div>
+        </details>
+
 
       <div className="pt-2 border-t" />
         {/* 箭头配置 */}
@@ -585,20 +622,6 @@ function Visualizer() {
   const onNext = () => { GlobalState.setPlaying(false); GlobalState.setStepIndex(Math.min(moves.length, gs.stepIndex + 1)); };
   const onTogglePlay = () => { if (!moves || moves.length === 0) return; if (gs.stepIndex >= moves.length) GlobalState.setStepIndex(0); GlobalState.setPlaying(!playing); };
 
-  // export current step PNG
-  const exportCurrentPng = async () => {
-    const node = containerRef.current;
-    if (!node) return;
-    // ensure arrow visibility follows setting
-    const canvas = await html2canvas(node);
-    downloadDataUrl(canvas.toDataURL('image/png'), `step-${gs.stepIndex}.png`);
-  };
-
-  // export all steps to ZIP (include step-0)
-  const exportAllZip = async () => {
-    await exportSnapshotsAsZip(gs.snapshots, gs.moves, gs);
-  };
-
   const currentMove: Move | null = moves && moves.length
   ? gs.stepIndex < moves.length ? moves[gs.stepIndex] : null
   : null;
@@ -629,10 +652,9 @@ function Visualizer() {
             <button onClick={onTogglePlay} className={`px-4 py-2 rounded-xl ${gs.playing ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'}`}>{gs.playing ? '暂停' : '播放'}</button>
             <button onClick={onNext} className="px-3 py-2 rounded-xl bg-gray-200">下一步</button>
             <button onClick={() => { GlobalState.setPlaying(false); GlobalState.setStepIndex(0); }} className="px-3 py-2 rounded-xl bg-gray-200">回到开始</button>
-            <button onClick={exportCurrentPng} className="px-3 py-2 rounded-xl bg-indigo-600 text-white">导出当前步图片</button>
-            <button onClick={exportAllZip} className="px-3 py-2 rounded-xl bg-teal-600 text-white">批量导出 ZIP</button>
           </div>
         </div>
+    
 
         <div className="mt-4 h-2 w-full rounded-full bg-gray-100 overflow-hidden">
           <div className="h-full bg-indigo-500" style={{ width: `${progress * 100}%` }} />
