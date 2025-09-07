@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import html2canvas from "html2canvas";
 import JSZip from "jszip";
 
+import GlobalState, { useGlobal, type Move, type Snapshot } from "./state/GlobalState";
 // ==========================================
 // Hanoi Explorer
 // 功能：
@@ -13,6 +14,7 @@ import JSZip from "jszip";
 // ==========================================
 
 export default function App() {
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     // 如果 URL 没有参数，则直接返回，不做任何修改
@@ -41,9 +43,6 @@ export default function App() {
         GlobalState.setDiskColors(JSON.parse(colors));
       } catch {}
     }
-
-    // const moves = generateMoves(n, start, end);
-    // GlobalState.setMoves(moves);
   }, []);
   
   return (
@@ -65,112 +64,7 @@ export default function App() {
   );
 }
 
-type Move = { from: number; to: number };
 type Point = { x: number; y: number };
-type DiskColors = Record<number, string>;
-type Peg = number[];
-type Snapshot = Peg[];
-
-
-// --------- Global state (simple event bus) ----------
-const GlobalState = {
-  n: 4,
-  setN(n: number) { 
-    this.n = n; 
-    emit(); 
-  },
-  moves: [] as Move[],
-  setMoves(m: Move[]) { this.moves = m; emit(); },
-  snapshots: [] as Snapshot[], // 每一步的快照（包含 step-0）
-  stepIndex: 0,
-  setSnapshots(s: Snapshot[]) { this.snapshots = s;console.log(s); emit(); },
-  setStepIndex(i: number) { this.stepIndex = i; emit(); },
-
-  diskColors: {} as DiskColors, // 初始化为空
-  initDiskColors(n: number = 4) {
-    const defaultColors = ["#ffff00", "#0000ff", "#00ff00", "#ff0000"];
-    const colors: Record<number, string> = {};
-    for (let i = 1; i <= n; i++) {
-      colors[i] = defaultColors[(i - 1) % defaultColors.length];
-    }
-    this.diskColors = colors;
-    emit();
-  },
-  setDiskColors(colors: DiskColors) {
-    this.diskColors = colors;
-    emit();
-  },
- 
-  pegNames: ["左", "中", "右"], // 默认名称
-
-  startPeg: 0,
-  middlePeg: 1,
-  endPeg: 2,
-  setStartPeg(start: number) {
-    const oldStart = this.startPeg;
-    const oldEnd = this.endPeg;
-    console.log("oldEnd:"+this.endPeg)
-    if (start === oldEnd) {
-      // 自动互换
-      console.log("触发自动互换")
-      this.startPeg = oldEnd;
-      this.endPeg = oldStart;
-    } else {
-      this.startPeg = start;
-    }
-    console.log("NewStart:"+this.startPeg)
-    console.log("NewEnd:"+this.endPeg)
-    emit(); // 确保组件渲染拿到最新值
-  },
-  
-  setMiddlePeg(p: number) { this.middlePeg = p; emit(); },
-  
-  setEndPeg(end: number) {
-    const oldStart = this.startPeg
-    const oldEnd = this.endPeg;
-    if (end === this.startPeg) {
-      // 自动互换
-      console.log("触发自动互换")
-      this.endPeg = oldStart;
-      this.startPeg = oldEnd;
-    } else {
-      this.endPeg = end;
-    }
-    emit();
-  },
-
-  
-  playing: false,
-  setPlaying(p: boolean) { this.playing = p; emit(); },
-  baseMs: 600, // base ms per step at 1x
-  setBaseMs(ms: number) { this.baseMs = ms; emit(); },
-  speedMultiplier: 1,
-  setSpeedMultiplier(m: number) { this.speedMultiplier = m; emit(); },
-
-
-  showArrow: true,
-  setShowArrow(b: boolean) { this.showArrow = b; emit(); },
-  arrowColor: "#ff0000",
-  setArrowColor(c: string) { this.arrowColor = c; emit(); },
-  arrowWidth: 2,
-  setArrowWidth(w: number) { this.arrowWidth = w; emit(); },
-  setPegNames(names: string[]) {this.pegNames = names; emit(); },
-
-};
-
-const listeners = new Set<() => void>();
-function emit() { listeners.forEach((fn) => fn()); }
-
-const useGlobal = (() => {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const fn = () => setTick((v) => v + 1);
-    listeners.add(fn);
-    return () => { listeners.delete(fn); }; // 用 {} 包裹，返回 void
-  }, []);
-  return GlobalState;
-});
-
 // --------- Utilities ---------
 function bigintPow2(n: number) { return 1n << BigInt(n); }
 function minMovesBigInt(n: number) { return n < 0 ? 0n : bigintPow2(n) - 1n; }
