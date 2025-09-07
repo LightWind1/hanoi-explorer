@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
 
-export type Move = { from: number; to: number };
-type DiskColors = Record<number, string>;
-type Peg = number[];
-export type Snapshot = Peg[];
+import type { Move, Snapshot } from "./state/Types";
 
 
 // --------- Global state (simple event bus) ----------

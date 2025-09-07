@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import html2canvas from "html2canvas";
 import JSZip from "jszip";
 
-import GlobalState, { useGlobal, type Move, type Snapshot } from "./state/GlobalState";
+import GlobalState, { useGlobal } from "./state/GlobalState";
+import type { Move, Snapshot, Point } from "./state/Types";
 // ==========================================
 // Hanoi Explorer
 // 功能：
@@ -64,7 +65,7 @@ export default function App() {
   );
 }
 
-type Point = { x: number; y: number };
+
 // --------- Utilities ---------
 function bigintPow2(n: number) { return 1n << BigInt(n); }
 function minMovesBigInt(n: number) { return n < 0 ? 0n : bigintPow2(n) - 1n; }
