@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import type { Move, Snapshot } from "./Types";
+import type { Move, Snapshot, DiskColors } from "./Types";
 
 
 // --------- Global state (simple event bus) ----------

@@ -1,6 +1,5 @@
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import GlobalState, { useGlobal} from "../state/GlobalState";
-import type { Move, Snapshot, Point } from "../state/Types";
 import { generateMovesAuto, exportSnapshotsAsZip ,computeSnapshots, minMovesBigInt, formatBigInt ,downloadDataUrl} from "../utils/hanoi";
 import html2canvas from "html2canvas";
 

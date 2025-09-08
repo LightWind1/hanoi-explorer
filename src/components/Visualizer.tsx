@@ -2,9 +2,9 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import GlobalState, { useGlobal } from "../state/GlobalState";
-import type { Move, Point , Snapshot } from "../state/Types";
+import type { Move, Point } from "../state/Types";
 
-import { formatBigInt, minMovesBigInt ,getStateAfterKMoves} from "../utils/hanoi";
+import { formatBigInt, minMovesBigInt ,getStateAfterKMoves,diskWidth,pegLabel} from "../utils/hanoi";
 import MoveList from "./MoveList";
 
 
@@ -174,12 +174,5 @@ function buildSvgPath(p1: Point, p2: Point) {
   return `M ${x1} ${y1} Q ${mx} ${Math.round(controlY)} ${x2} ${y2}`;
 }
 
-function diskWidth(size:number, n:number) {
-  const minW = 40; const maxW = 180; if (n <= 1) return maxW; return minW + ((size - 1) * (maxW - minW)) / (n - 1);
-}
 
-export function pegLabel(i: number, gs: typeof GlobalState): string  { 
-  return gs.pegNames[i] || ["左", "中", "右"][i];
-
-}
 

@@ -1,6 +1,7 @@
 import GlobalState from "../state/GlobalState";
 import type { Move, Snapshot } from "../state/Types";
 
+
 import JSZip from "jszip";
 
 export function bigintPow2(n: number) { return 1n << BigInt(n); }
@@ -149,6 +150,16 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, _x1:number, _y1:number, x2
   ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(bx + px*size*0.6, by + py*size*0.6); ctx.lineTo(bx - px*size*0.6, by - py*size*0.6); ctx.closePath(); ctx.fill();
 }
 
+
+
+export function diskWidth(size:number, n:number) {
+  const minW = 40; const maxW = 180; if (n <= 1) return maxW; return minW + ((size - 1) * (maxW - minW)) / (n - 1);
+}
+
+export function pegLabel(i: number, gs: typeof GlobalState): string  { 
+  return gs.pegNames[i] || ["左", "中", "右"][i];
+
+}
 
 // ---------------------- light tests ----------------------
 (function runLightTests(){

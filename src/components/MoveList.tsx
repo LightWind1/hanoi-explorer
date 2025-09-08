@@ -1,5 +1,5 @@
 import GlobalState, { useGlobal } from "../state/GlobalState";
-import { pegLabel } from "./Visualizer";
+import { pegLabel }  from "../utils/hanoi";
 
 // --------- MoveList ---------
 export default function MoveList() {
