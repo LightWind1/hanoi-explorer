@@ -93,7 +93,7 @@ export async function exportSnapshotsAsZip(snapshots: Snapshot[], moves: Move[],
     snapshot.forEach((pegArr, pegIdx) => {
       pegArr.slice().forEach((size, idxFromBottom) => {
         const diskIdx = idxFromBottom; // bottom=0
-        const w = diskWidth(size, gs.n);
+        const w = diskWidth(size, gs.n, W);
         const h = 22;
         const x = xs[pegIdx] - w / 2;
         const y = H - 48 - diskIdx * (h + 2) - h + 6; // stack from bottom
@@ -151,10 +151,16 @@ function drawArrowHead(ctx: CanvasRenderingContext2D, _x1:number, _y1:number, x2
 }
 
 
+// 动态计算盘子宽度
+export function diskWidth(size: number, n: number, containerWidth: number) {
+  // 基于容器宽度动态计算
+  const minW = containerWidth * 0.10;  // 最小宽度 ~ 8%
+  const maxW = containerWidth * 0.25;  // 最大宽度 ~ 28%
 
-export function diskWidth(size:number, n:number) {
-  const minW = 40; const maxW = 180; if (n <= 1) return maxW; return minW + ((size - 1) * (maxW - minW)) / (n - 1);
+  if (n <= 1) return maxW;
+  return minW + ((size - 1) * (maxW - minW)) / (n - 1);
 }
+
 
 export function pegLabel(i: number, gs: typeof GlobalState): string  { 
   return gs.pegNames[i] || ["左", "中", "右"][i];

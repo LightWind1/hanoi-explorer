@@ -7,7 +7,6 @@ import type { Move, Point } from "../state/Types";
 import { formatBigInt, minMovesBigInt ,getStateAfterKMoves,diskWidth,pegLabel} from "../utils/hanoi";
 import MoveList from "./MoveList";
 
-
 // --------- Visualizer (with curved arrow) ---------
 export default function Visualizer() {
   const gs = useGlobal();
@@ -17,9 +16,11 @@ export default function Visualizer() {
   const pegRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
 
   const [pegPos, setPegPos] = useState([{x:0,y:0},{x:0,y:0},{x:0,y:0}]);
+  const [containerWidth, setContainerWidth] = useState(0);
 
   const pegs = useMemo(() => {
-    if (gs.snapshots && gs.snapshots.length) return gs.snapshots[Math.min(stepIndex, gs.snapshots.length - 1)];
+    if (gs.snapshots && gs.snapshots.length)
+         return gs.snapshots[Math.min(stepIndex, gs.snapshots.length - 1)];
     return getStateAfterKMoves(n, moves, stepIndex, gs.startPeg || 0);
   }, [n, moves, stepIndex, gs.snapshots, gs.startPeg]);
 
@@ -29,6 +30,9 @@ export default function Visualizer() {
       const container = containerRef.current;
       if (!container) return;
       const rect = (container as HTMLElement).getBoundingClientRect();
+
+      setContainerWidth(rect.width);
+
       const pos: Point[] = pegRefs.map((r) => {
         const el = r.current;
         if (!el) return { x: rect.left + rect.width * 0.16, y: rect.top + 40 };
@@ -114,7 +118,7 @@ export default function Visualizer() {
                       transition={{ type:'spring', stiffness:400, damping:30 }} 
                       className="h-6 rounded-full shadow-sm flex items-center justify-center text-xs font-medium text-white" 
                       style={{
-                         width: `${diskWidth(size,n)}px`, 
+                         width: diskWidth(size,n,containerWidth), 
                          background: GlobalState.diskColors[size] || "#888" // 默认灰色
                   }}>{size}</motion.div>
                   ))}
