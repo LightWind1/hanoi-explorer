@@ -132,7 +132,7 @@ export default function Visualizer() {
 
         {/* SVG arrow layer: uses absolute coordinates relative to containerRef */}
         {gs.showArrow && currentMove && (
-          <svg className="absolute inset-0 pointer-events-none">
+          <svg className="absolute inset-0 w-full pointer-events-none">
             <defs>
               <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth">
                 <path d="M0,0 L9,4 L0,8 z" fill={gs.arrowColor} />
